@@ -1,0 +1,109 @@
+<#
+.SYNOPSIS
+  Toggle Windows 11 classic context menu ("Show more options") behavior for current user.
+
+.DESCRIPTION
+  - Enable classic menu: creates the known HKCU CLSID override with empty InprocServer32 default value
+  - Disable classic menu: removes the override key (equivalent to your .reg delete)
+  - Restarts Explorer to apply immediately
+
+.NOTES
+  Works under HKCU (no admin required). Tested approach commonly used on Windows 11.
+#>
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+$Guid = "{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}"
+$ClsidRoot = "HKCU:\Software\Classes\CLSID"
+$ClsidKey  = Join-Path $ClsidRoot $Guid
+$InprocKey = Join-Path $ClsidKey "InprocServer32"
+
+function Test-ClassicMenuEnabled {
+  return (Test-Path $InprocKey)
+}
+
+function Enable-ClassicContextMenu {
+  New-Item -Path $InprocKey -Force | Out-Null
+
+  # Set the (Default) value of InprocServer32 to empty string
+  # Set-Item targets the key's default value.
+  Set-Item -Path $InprocKey -Value "" | Out-Null
+}
+
+function Disable-ClassicContextMenu {
+  if (Test-Path $ClsidKey) {
+    Remove-Item -Path $ClsidKey -Recurse -Force
+  }
+}
+
+function Restart-Explorer {
+  # Soft restart of Explorer so the shell picks up the registry change immediately
+  $explorers = Get-Process explorer -ErrorAction SilentlyContinue
+  if ($null -ne $explorers) {
+    $explorers | Stop-Process -Force
+    Start-Sleep -Milliseconds 700
+  }
+  Start-Process explorer.exe | Out-Null
+}
+
+function Show-Header {
+  Clear-Host
+  $status = if (Test-ClassicMenuEnabled) { "ENABLED" } else { "DISABLED" }
+
+  Write-Host "==============================================================="
+  Write-Host "  WIN11 CONTEXT MENU TOGGLER  ::  CLSID $Guid"
+  Write-Host "---------------------------------------------------------------"
+  Write-Host "  Classic context menu status: $status"
+  Write-Host "==============================================================="
+  Write-Host ""
+}
+
+function Pause-AnyKey {
+  Write-Host ""
+  Read-Host "Press Enter to continue" | Out-Null
+}
+
+while ($true) {
+  Show-Header
+
+  Write-Host "Choose an option:"
+  Write-Host "  [1] Enable classic context menu (always show old menu)"
+  Write-Host "  [2] Disable classic context menu (restore Windows 11 default)"
+  Write-Host "  [3] Restart Explorer only"
+  Write-Host "  [Q] Quit"
+  Write-Host ""
+
+  $choice = (Read-Host "Selection").Trim().ToUpperInvariant()
+
+  try {
+    switch ($choice) {
+      "1" {
+        Enable-ClassicContextMenu
+        Restart-Explorer
+        Write-Host "`nDone: Classic context menu ENABLED."
+        Pause-AnyKey
+      }
+      "2" {
+        Disable-ClassicContextMenu
+        Restart-Explorer
+        Write-Host "`nDone: Classic context menu DISABLED (Windows 11 default restored)."
+        Pause-AnyKey
+      }
+      "3" {
+        Restart-Explorer
+        Write-Host "`nDone: Explorer restarted."
+        Pause-AnyKey
+      }
+      "Q" { break }
+      default {
+        Write-Host "`nUnknown choice."
+        Pause-AnyKey
+      }
+    }
+  }
+  catch {
+    Write-Host "`nERROR: $($_.Exception.Message)"
+    Pause-AnyKey
+  }
+}
