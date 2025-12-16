@@ -35,7 +35,7 @@ internal static class Program
                         ApplyShellChanges();
                         RestartExplorer();
                         Info("Done: \"Show more options\" DISABLED (classic full context menu enabled).");
-                        Pause();
+                        PromptForSessionAction();
                         break;
 
                     case "2":
@@ -43,7 +43,7 @@ internal static class Program
                         ApplyShellChanges();
                         RestartExplorer();
                         Info("Done: \"Show more options\" ENABLED (Windows 11 default restored).");
-                        Pause();
+                        PromptForSessionAction();
                         break;
 
                     case "3":
@@ -140,6 +140,45 @@ internal static class Program
 
         // 2) Shell change notify (forces shell refresh)
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    private static void PromptForSessionAction()
+    {
+        Console.WriteLine();
+        Console.WriteLine("The change has been applied.");
+        Console.WriteLine("If \"Show more options\" is still visible, a restart or sign-out may be required.");
+        Console.WriteLine();
+        Console.WriteLine("  [R] Restart Windows now");
+        Console.WriteLine("  [L] Sign out now");
+        Console.WriteLine("  [C] Continue");
+        Console.WriteLine();
+
+        Console.Write("Selection: ");
+        var choice = (Console.ReadLine() ?? string.Empty).Trim().ToUpperInvariant();
+
+        switch (choice)
+        {
+            case "R":
+                Process.Start(new ProcessStartInfo("shutdown", "/r /t 0")
+                {
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                });
+                break;
+
+            case "L":
+                Process.Start(new ProcessStartInfo("shutdown", "/l")
+                {
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                });
+                break;
+
+            case "C":
+            default:
+                // Do nothing, return to main menu
+                break;
+        }
     }
 
     private const int HWND_BROADCAST = 0xffff;
